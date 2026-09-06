@@ -1,0 +1,16 @@
+[
+  {
+    "event_date": "2026-09-16",
+    "title": "FOMC 회의 (1일차)",
+    "importance": "HIGH",
+    "source": "수동 등록",
+    "kst_time": null
+  },
+  {
+    "event_date": "2026-09-17",
+    "title": "FOMC 금리 결정 + 점도표",
+    "importance": "HIGH",
+    "source": "수동 등록",
+    "kst_time": "09/18 03:00 KST"
+  }
+]

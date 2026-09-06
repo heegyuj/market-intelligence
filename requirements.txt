@@ -1,0 +1,14 @@
+# 데이터 수집
+yfinance>=0.2.55
+pandas>=2.2.0
+numpy>=1.26.0
+requests>=2.32.0
+feedparser>=6.0.11
+pykrx>=1.0.45          # 한국 외국인/기관 순매수 (선택)
+
+# AI
+anthropic>=0.40.0
+
+# 유틸
+python-dotenv>=1.0.1
+tenacity>=8.5.0
