@@ -1,1 +1,87 @@
 
+name: Morning Market Briefing
+
+on:
+  schedule:
+    - cron: "0 22 * * 0-4"
+  workflow_dispatch:
+    inputs:
+      test_mode:
+        description: "카카오 발송 없이 브리핑만 생성"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: morning-briefing
+  cancel-in-progress: false
+
+jobs:
+  briefing:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: 의존성 설치
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: 히스토리 DB 캐시 복원
+        uses: actions/cache@v4
+        with:
+          path: data/market.db
+          key: market-db-${{ github.run_id }}
+          restore-keys: |
+            market-db-
+
+      - name: 브리핑 생성 및 발송
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+          KAKAO_REST_API_KEY: ${{ secrets.KAKAO_REST_API_KEY }}
+          KAKAO_CLIENT_SECRET: ${{ secrets.KAKAO_CLIENT_SECRET }}
+          KAKAO_ACCESS_TOKEN: ${{ secrets.KAKAO_ACCESS_TOKEN }}
+          KAKAO_REFRESH_TOKEN: ${{ secrets.KAKAO_REFRESH_TOKEN }}
+          BRIEFING_PUBLIC_URL: ${{ secrets.BRIEFING_PUBLIC_URL }}
+          KAKAO_SEND_MODE: ${{ vars.KAKAO_SEND_MODE || 'link' }}
+          AI_MODEL: ${{ vars.AI_MODEL || 'claude-opus-5' }}
+          TZ: Asia/Seoul
+        run: |
+          if [ "${{ inputs.test_mode }}" = "true" ]; then
+            python -m src.main --test
+          else
+            python -m src.main
+          fi
+
+      - name: 아카이브 커밋
+        if: always()
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add reports/ || true
+          if git diff --staged --quiet; then
+            echo "변경 없음"
+          else
+            git commit -m "브리핑 아카이브 $(date +%Y-%m-%d)"
+            git push
+          fi
+
+      - name: 실패 시 로그 업로드
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: briefing-logs
+          path: |
+            reports/
+            data/*.db
+          retention-days: 7
