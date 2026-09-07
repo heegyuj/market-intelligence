@@ -1,1 +1,10 @@
 
+.env
+token_store.json
+data/*.db
+data/cache/
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.DS_Store
