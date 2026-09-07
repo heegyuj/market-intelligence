@@ -1,0 +1,73 @@
+name: 카카오 토큰 발급
+
+on:
+  workflow_dispatch:
+    inputs:
+      rest_api_key:
+        description: "REST API 키"
+        required: true
+      redirect_uri:
+        description: "Redirect URI (콘솔 등록값과 동일해야 함)"
+        required: true
+        default: "https://example.com/oauth"
+      code:
+        description: "인가 코드 (1단계에서는 비워두세요)"
+        required: false
+        default: ""
+
+jobs:
+  token:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 실행
+        env:
+          KEY: ${{ inputs.rest_api_key }}
+          URI: ${{ inputs.redirect_uri }}
+          CODE: ${{ inputs.code }}
+        run: |
+          echo "::add-mask::$KEY"
+          python3 - <<'PY'
+          import os, urllib.parse, urllib.request, json
+
+          key  = os.environ["KEY"]
+          uri  = os.environ["URI"]
+          code = os.environ["CODE"].strip()
+
+          if not code:
+              q = urllib.parse.urlencode({
+                  "client_id": key, "redirect_uri": uri,
+                  "response_type": "code", "scope": "talk_message",
+              })
+              print("\n" + "=" * 60)
+              print("1단계: 아래 주소를 브라우저에서 여세요")
+              print("=" * 60)
+              print(f"\nhttps://kauth.kakao.com/oauth/authorize?{q}\n")
+              print("동의 후 이동한 주소의 ?code= 뒤 값을 복사해서")
+              print("이 워크플로를 다시 실행하며 code 칸에 넣으세요.")
+              print("code는 몇 분 안에 만료되니 바로 진행하세요.")
+              raise SystemExit(0)
+
+          data = urllib.parse.urlencode({
+              "grant_type": "authorization_code",
+              "client_id": key, "redirect_uri": uri, "code": code,
+          }).encode()
+          try:
+              with urllib.request.urlopen(
+                  "https://kauth.kakao.com/oauth/token", data, timeout=15
+              ) as r:
+                  tok = json.load(r)
+          except urllib.error.HTTPError as e:
+              print("\n실패:", e.code)
+              print(e.read().decode())
+              print("\ninvalid_grant → code 만료/재사용. 1단계부터 다시 하세요.")
+              print("redirect_uri mismatch → 콘솔 등록값과 다릅니다.")
+              raise SystemExit(1)
+
+          print("\n" + "=" * 60)
+          print("성공. 아래 값을 Secrets에 등록하세요")
+          print("=" * 60)
+          print(f"\nKAKAO_REST_API_KEY = {key}")
+          print(f"\nKAKAO_REFRESH_TOKEN = {tok['refresh_token']}")
+          print(f"\nKAKAO_ACCESS_TOKEN = {tok['access_token']}")
+          print(f"\n(refresh_token 유효기간 {tok.get('refresh_token_expires_in')}초)")
+          PY
